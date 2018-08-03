@@ -904,7 +904,7 @@ int main(int argc, char** argv)
 	cout << "NUM SUPERSTEPS: " << superstepNo << endl;
 	cout << "FINAL NUM PARTITIONS: " << partitions.size() << endl;
 	cout << "FINAL NUM EDGES: " << numEdges << endl;
-	cout << "TOTAL SPAGPU TIME: " << getElapsedTime(startTime) << "s." << endl;
+	cout << "TOTAL SPAGPU TIME: " << getElapsedTime(startTime) << "min." << endl;
 
 	return 0;
 }
