@@ -1,0 +1,1 @@
+../bin/comp inputFiles/rules_pointsto.txt inputFiles/programGraph_sample_pointsto.txt

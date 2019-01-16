@@ -20,9 +20,9 @@ extern int selectedDevice;
 extern int numLabels;
 extern uint numVars;
 
-#define DEVMEMUSED_MB 10000
+#define DEVMEMUSED_MB 2000
 
-#define COMPRESSED 1
+#define COMPRESSED 0
 
 #define NUMTHREADS 8
 
