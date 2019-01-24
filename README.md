@@ -14,7 +14,7 @@ GpuSpa needs two input files: (1) a program graph on which GpuSpa can perform co
 
 After getting the graph and grammar file, run GpuSpa by entering the following command and monitor the progress of the computation on the screen:
 ```
-../bin/comp <graph_file>  <grammar_file> <element_width> <memory_budget>
+../bin/comp <graph_file>  <grammar_file>  <element_width>  <memory_budget>
 ```
 ## Project Contributors
 * [**Zhiqiang Zuo**](http://zuozhiqiang.bitbucket.io/) - *Assistant Professor, Nanjing University*
