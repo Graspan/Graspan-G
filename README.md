@@ -18,4 +18,4 @@ After getting the graph and grammar file, run GpuSpa by entering the following c
 ```
 ## Project Contributors
 * [**Zhiqiang Zuo**](http://zuozhiqiang.bitbucket.io/) - *Assistant Professor, Nanjing University*
-* **Shenming Lu** - *Graduate Student, Nanjing University*
+* **Shenming Lu** - *Master Student, Nanjing University*
