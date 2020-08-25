@@ -18,4 +18,5 @@ After getting the graph and grammar file, run Graspan-G by entering the followin
 ```
 ## Project Contributors
 * [**Zhiqiang Zuo**](https://z-zhiqiang.github.io/) - *Assistant Professor, Nanjing University*
+* **Yiyu Zhang** - *PhD Student, Nanjing University*
 * **Shenming Lu** - *Master Student, Nanjing University*
