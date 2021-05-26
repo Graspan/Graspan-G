@@ -761,7 +761,7 @@ void repartition(vector<Partition> &partitions, int s, int d, int start, uint he
 	storeElements(partitions[d], d, elements2, degree, ioServ);
 }
 
-void precomputation(char *filePath, vector<Partition> &partitions, map<string, int> labelMap, uint *degree, uint heapSize, uint *elementPool, boost::asio::io_service &ioServ)
+void precomputation(char *filePath, vector<Partition> &partitions, map<string, int> labelMap, uint *degree, uint heapSize, uint *elementPool, boost::asio::io_service &ioServ, uint filter)
 {
 	cout << "##### SUPERSTEP 0 #####" << endl;
 	for (int i = 0; i < partitions.size(); i++) {
@@ -780,13 +780,18 @@ void precomputation(char *filePath, vector<Partition> &partitions, map<string, i
 		for (;;) {
 			cout << "## ITERATION " << ++iterNo << " ##" << endl;
 			bool r = false;
-			do {
-				if (r) {
-					repartition(partitions, i, i + 1, 0, heapSize, elementPool, degree, ioServ);
-					r = false;
-				}
-				spagpu_s(partitions[i], 0, heapSize, elementPool, r);
-			} while (r);
+			if(filter == 0){
+				do {
+					if (r) {
+						repartition(partitions, i, i + 1, 0, heapSize, elementPool, degree, ioServ);
+						r = false;
+					}
+					spagpu_s(partitions[i], 0, heapSize, elementPool, r, filter);
+				} while (r);
+			}else{
+				spagpu_s(partitions[i], 0, heapSize, elementPool, r, filter);
+			}
+
 			mergeAndDiff(partitions[i], heapSize, elementPool);
 			if (partitions[i].deltaSize == 0) {
 				partitions[i].deltaSize = partitions[i].oldSize;
@@ -798,7 +803,7 @@ void precomputation(char *filePath, vector<Partition> &partitions, map<string, i
 	}
 }
 
-void run_computation(vector<Partition> &partitions, uint heapSize, uint *elementPool, uint *degree, boost::asio::io_service &ioServ)
+void run_computation(vector<Partition> &partitions, uint heapSize, uint *elementPool, uint *degree, boost::asio::io_service &ioServ, uint filter)
 {
 	for (int i = 0; i < partitions.size(); i++) {
 		bool r1 = false;
@@ -812,29 +817,35 @@ void run_computation(vector<Partition> &partitions, uint heapSize, uint *element
 
 			// rule application
 			std::cout << "== COMP START ==" << std::endl;
-			do {
-				if (r1) {
-					repartition(partitions, i, j + 1, 0, heapSize, elementPool, degree, ioServ);
-					r1 = false;
-				}
-				if (r2) {
-					repartition(partitions, j, j + 1, 1, heapSize, elementPool, degree, ioServ);
-					r2 = false;
-				}
-				spagpu_b(partitions[i], partitions[j], r1, r2, heapSize, elementPool);
-			} while (r1 || r2);
+			if(filter == 0){
+				do {
+					if (r1) {
+						repartition(partitions, i, j + 1, 0, heapSize, elementPool, degree, ioServ);
+						r1 = false;
+					}
+					if (r2) {
+						repartition(partitions, j, j + 1, 1, heapSize, elementPool, degree, ioServ);
+						r2 = false;
+					}
+					spagpu_b(partitions[i], partitions[j], r1, r2, heapSize, elementPool, filter);
+				} while (r1 || r2);
 
-			do {
-				if (r1) {
-					repartition(partitions, i, j + 1, 0, heapSize, elementPool, degree, ioServ);
-					r1 = false;
-				}
-				if (r2) {
-					repartition(partitions, j, j + 1, 1, heapSize, elementPool, degree, ioServ);
-					r2 = false;
-				}
-				spagpu(partitions[i], partitions[j], r1, r2, heapSize);
-			} while (r1 || r2);
+				do {
+					if (r1) {
+						repartition(partitions, i, j + 1, 0, heapSize, elementPool, degree, ioServ);
+						r1 = false;
+					}
+					if (r2) {
+						repartition(partitions, j, j + 1, 1, heapSize, elementPool, degree, ioServ);
+						r2 = false;
+					}
+					spagpu(partitions[i], partitions[j], r1, r2, heapSize, filter);
+				} while (r1 || r2);
+			}else{
+				spagpu_b(partitions[i], partitions[j], r1, r2, heapSize, elementPool, filter);
+				spagpu(partitions[i], partitions[j], r1, r2, heapSize, filter);
+			}
+
 			std::cout << "== COMP END ==" << std::endl;
 
 			transferBackAndStoreElements(partitions[j], j, 1, heapSize, elementPool, degree, ioServ);
@@ -876,11 +887,11 @@ int main(int argc, char** argv)
 		threadPool.create_thread(boost::bind(&boost::asio::io_service::run, &ioServ));
 
 	int superstepNo = 0;
-	precomputation(argv[2], partitions, labelMap, degree, heapSize, elementPool, ioServ);
+	precomputation(argv[2], partitions, labelMap, degree, heapSize, elementPool, ioServ, atoi(argv[3]));
 
 	for (;;) {
 		cout << "##### SUPERSTEP " << ++superstepNo << " #####" << endl;
-		run_computation(partitions, heapSize, elementPool, degree, ioServ);
+		run_computation(partitions, heapSize, elementPool, degree, ioServ, atoi(argv[3]));
 
 		// The computation is finished when no new edges can be added.
 		bool done = true;

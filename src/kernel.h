@@ -6,6 +6,9 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
+#include <sstream>
+#include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -20,13 +23,13 @@ extern int selectedDevice;
 extern int numLabels;
 extern uint numVars;
 
-#define DEVMEMUSED_MB 2000
+#define DEVMEMUSED_MB 10000
 
 #define COMPRESSED 0
 
 #define NUMTHREADS 8
 
-#define ELEMENT_WIDTH 32
+#define ELEMENT_WIDTH 8
 #define ELEMENT_CARDINALITY ((ELEMENT_WIDTH - 2) * 32)
 #define BASE (ELEMENT_WIDTH - 2)
 #define NEXT (ELEMENT_WIDTH - 1)
@@ -115,11 +118,11 @@ void allocateElementPool(uint &heapSize, uint* &elementPool);
 
 void transferElements(Partition p, uint *elements, int start, uint heapSize, uint *elementPool);
 
-void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r);
+void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r, uint filter);
 
-void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint *elementPool);
+void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint *elementPool, uint filter);
 
-void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize);
+void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint filter);
 
 void getDegree(Partition p, int start, uint *degree);
 

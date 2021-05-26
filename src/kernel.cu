@@ -1,7 +1,7 @@
 #include "kernel.h"
 
 int selectedDevice;
-const int N = 20;
+const int N = 21;
 int numLabels;
 uint numVars;
 
@@ -463,7 +463,7 @@ __global__ void compute00(uint firstVar, uint lastVar, uint tmpOffset, int start
 	resetWorklistIndex();
 }
 
-void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r)
+void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r, uint filter)
 {
 	std::cout << "Self-matching..." << std::flush;
 	uint blocks = getBlocks();
@@ -487,15 +487,21 @@ void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r
 		needRepartition(p, heapSize, r);
 		if (r) return;
 	}
-	compute10<<<blocks, threads>>>(p.firstVar, p.lastVar, p.oldSize, start, tmp_s);
-	needRepartition(p, heapSize, r);
-	if (r) return;
+	if(filter == 0){
+		compute10<<<blocks, threads>>>(p.firstVar, p.lastVar, p.oldSize, start, tmp_s);
+		needRepartition(p, heapSize, r);
+		if (r) return;
+	}
+
 	ComputeRegion new_s(p.firstVar, p.lastVar, start, p.oldSize, true);
 	if (p.oldSize != 0) {
 		ComputeRegion old_s(p.firstVar, p.lastVar, start, 0, true);
-		compute11<<<blocks, threads>>>(old_s, new_s, empty, tmp_s);
-		needRepartition(p, heapSize, r);
-		if (r) return;
+		if(filter == 0){
+			compute11<<<blocks, threads>>>(old_s, new_s, empty, tmp_s);
+			needRepartition(p, heapSize, r);
+			if (r) return;
+		}
+
 		compute11<<<blocks, threads>>>(new_s, old_s, new_s, tmp_s);
 		needRepartition(p, heapSize, r);
 		if (r) return;
@@ -514,7 +520,7 @@ void spagpu_s(Partition &p, int start, uint heapSize, uint *elementPool, bool &r
 	std::cout << "OK." << std::endl;
 }
 
-void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint *elementPool)
+void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint *elementPool, uint filter)
 {
 	uint blocks = getBlocks();
 	dim3 threads(ELEMENT_WIDTH, THREADS_PER_BLOCK / ELEMENT_WIDTH);
@@ -547,11 +553,13 @@ void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, u
 	ComputeRegion tmp2(p2.firstVar, p2.lastVar, 1, p2.oldSize + p2.deltaSize, true);
 	std::cout << "## ITERATION 0 ##" << std::endl;
 	if (p1.oldSize != 0 && p2.deltaSize != 0) {
-		ComputeRegion old1(p1.firstVar, p1.lastVar, 0, 0, true);
-		ComputeRegion new2(p2.firstVar, p2.lastVar, 1, p2.oldSize, true);
-		compute11<<<blocks, threads>>>(old1, new2, empty, tmp1);
-		needRepartition(p1, heapSize, r1);
-		if (r1) return;
+		if(filter == 0){
+			ComputeRegion old1(p1.firstVar, p1.lastVar, 0, 0, true);
+			ComputeRegion new2(p2.firstVar, p2.lastVar, 1, p2.oldSize, true);
+			compute11<<<blocks, threads>>>(old1, new2, empty, tmp1);
+			needRepartition(p1, heapSize, r1);
+			if (r1) return;
+		}
 	}
 	if (p1.deltaSize != 0) {
 		ComputeRegion new1(p1.firstVar, p1.lastVar, 0, p1.oldSize, true);
@@ -581,11 +589,14 @@ void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, u
 	cudaSafeCall(cudaMemcpyFromSymbol(&poolSize1, freeList1, sizeof(uint)));
 	p1.tmpSize = poolSize1 - p1.deltaSize - p1.oldSize;
 	if (p2.oldSize != 0 && p1.deltaSize != 0) {
-		ComputeRegion old2(p2.firstVar, p2.lastVar, 1, 0, true);
-		ComputeRegion new1(p1.firstVar, p1.lastVar, 0, p1.oldSize, true);
-		compute11<<<blocks, threads>>>(old2, new1, empty, tmp2);
-		needRepartition(p2, heapSize, r2);
-		if (r2) return;
+		if(filter == 0){
+			ComputeRegion old2(p2.firstVar, p2.lastVar, 1, 0, true);
+			ComputeRegion new1(p1.firstVar, p1.lastVar, 0, p1.oldSize, true);
+			compute11<<<blocks, threads>>>(old2, new1, empty, tmp2);
+			needRepartition(p2, heapSize, r2);
+			if (r2) return;
+		}
+
 	}
 	if (p2.deltaSize != 0) {
 		ComputeRegion new2(p2.firstVar, p2.lastVar, 1, p2.oldSize, true);
@@ -616,7 +627,7 @@ void spagpu_b(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, u
 	p2.tmpSize = poolSize2 - p2.deltaSize - p2.oldSize;
 }
 
-void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize)
+void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize, uint filter)
 {
 	uint blocks = getBlocks();
 	dim3 threads(ELEMENT_WIDTH, THREADS_PER_BLOCK / ELEMENT_WIDTH);
@@ -630,10 +641,13 @@ void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize)
 		bool changed = false;
 		cudaSafeCall(cudaMemcpyToSymbol(dev_changed, &changed, sizeof(bool)));
 		if (p1.oldSize != 0) {
-			ComputeRegion old1(p1.firstVar, p1.lastVar, 0, 0, true);
-			compute11<<<blocks, threads>>>(old1, tmp1, tmp2, tmp1);
-			needRepartition(p1, heapSize, r1);
-			if (r1) return;
+			if(filter == 0){
+				ComputeRegion old1(p1.firstVar, p1.lastVar, 0, 0, true);
+				compute11<<<blocks, threads>>>(old1, tmp1, tmp2, tmp1);
+				needRepartition(p1, heapSize, r1);
+				if (r1) return;
+			}
+
 		}
 		if (p1.deltaSize != 0) {
 			ComputeRegion new1(p1.firstVar, p1.lastVar, 0, p1.oldSize, true);
@@ -681,9 +695,12 @@ void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize)
 				if (r1) return;
 			}
 		}
-		compute10<<<blocks, threads>>>(p1.firstVar, p1.lastVar, p1.oldSize + p1.deltaSize, 0, tmp1);
-		needRepartition(p1, heapSize, r1);
-		if (r1) return;
+		if(filter == 0){
+			compute10<<<blocks, threads>>>(p1.firstVar, p1.lastVar, p1.oldSize + p1.deltaSize, 0, tmp1);
+			needRepartition(p1, heapSize, r1);
+			if (r1) return;
+		}
+
 		compute11<<<blocks, threads>>>(tmp1, tmp1, tmp2, tmp1);
 		needRepartition(p1, heapSize, r1);
 		if (r1) return;
@@ -691,10 +708,13 @@ void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize)
 		cudaSafeCall(cudaMemcpyFromSymbol(&poolSize1, freeList1, sizeof(uint)));
 		p1.tmpSize = poolSize1 - p1.deltaSize - p1.oldSize;
 		if (p2.oldSize != 0) {
-			ComputeRegion old2(p2.firstVar, p2.lastVar, 1, 0, true);
-			compute11<<<blocks, threads>>>(old2, tmp1, tmp2, tmp2);
-			needRepartition(p2, heapSize, r2);
-			if (r2) return;
+			if(filter == 0){
+				ComputeRegion old2(p2.firstVar, p2.lastVar, 1, 0, true);
+				compute11<<<blocks, threads>>>(old2, tmp1, tmp2, tmp2);
+				needRepartition(p2, heapSize, r2);
+				if (r2) return;
+			}
+
 		}
 		if (p2.deltaSize != 0) {
 			ComputeRegion new2(p2.firstVar, p2.lastVar, 1, p2.oldSize, true);
@@ -742,9 +762,12 @@ void spagpu(Partition &p1, Partition &p2, bool &r1, bool &r2, uint heapSize)
 				if (r2) return;
 			}
 		}
-		compute10<<<blocks, threads>>>(p2.firstVar, p2.lastVar, p2.oldSize + p2.deltaSize, 1, tmp2);
-		needRepartition(p2, heapSize, r2);
-		if (r2) return;
+		if(filter == 0){
+			compute10<<<blocks, threads>>>(p2.firstVar, p2.lastVar, p2.oldSize + p2.deltaSize, 1, tmp2);
+			needRepartition(p2, heapSize, r2);
+			if (r2) return;
+		}
+
 		compute11<<<blocks, threads>>>(tmp2, tmp1, tmp2, tmp2);
 		needRepartition(p2, heapSize, r2);
 		if (r2) return;
